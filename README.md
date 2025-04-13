@@ -1,29 +1,3 @@
-This is GenAI application to calculate the port tariff information for the vessel birthing at a certain port. Application uses agentic approach where 1st agent extracts text from "Port Tariff.pdf" document provided by authrorities in required format. And 2nd agent uses RAG approach to find out the relevent information about the vessel given user's query.
-
-How to run:
-I. Add proper configurations in ./conf/config.py file. Currently "GOOGLE_GENAI_API_KEY" is needed.
-II. Make sure you have the tariff document in ./data directory.
-III. Adjust the user_prompt according to your need in ./prompts.py file.
-IV. Make sure all required paths are correct in main.py file
-V. Install all dependencies in requirements.txt file
-VI. Run main.py file using "python main.py" command. Output should be printed on console. 
-
-
-
-Directory Structure:
-
-Main Repo :
-    - conf : DIR
-        -- config.py : Contains LLM Model and API KEY. Make changes according to requirements.
-    - data : DIR
-        -- Contains "Port Tariff.pdf" & "Port Tariff.txt"
-    - model : DIR
-        -- agent_document_loader.py : Document Loader agent that extracts text from pdf file and saves as txt.
-        -- agent_porttariff_engine.py : PortTariffEngine class where RAG model is defined.
-    - prompts.py : file : Contains user_prompt
-    - main.py : file : Run main.py to execute the pipeline.
-
-
 # Port Tariff Calculator
 
 ## Overview
