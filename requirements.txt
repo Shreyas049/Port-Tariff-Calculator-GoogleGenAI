@@ -1,0 +1,7 @@
+google
+pymupdf
+Pillow
+tenacity
+llama_index
+llama-index-llms-google-genai
+llama-index-embeddings-huggingface
