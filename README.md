@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Port Tariff Calculator is a GenAI application designed to calculate port tariff information for vessels birthing at specific ports. The application utilizes an agentic approach with two specialized agents:
+The Port Tariff Calculator is a GenAI application designed to calculate port tariff information for vessels berthing at specific ports. The application utilizes an agentic approach with two specialized agents:
 
 1. **Document Loader Agent**: Extracts text from "Port Tariff.pdf" documents provided by port authorities and converts them to a structured format.
 2. **Port Tariff RAG Agent**: Uses a Retrieval-Augmented Generation (RAG) approach to find relevant tariff information based on vessel details provided in the user's query.
