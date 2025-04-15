@@ -3,6 +3,7 @@ import time
 
 from model.agent_document_loader import DocumentLoader
 from model.agent_porttariff_engine import PortTariffEngine
+from model.agent_google_docintel import GoogleGenAIDocIntel
 from query import user_query
 
 if __name__ == "__main__":
@@ -18,5 +19,9 @@ if __name__ == "__main__":
     tariff_engine = PortTariffEngine(filename="Port Tariff.txt", text=text)
     response = asyncio.run(tariff_engine.query_llm(query=user_query))
 
-    print("Response:", response['answer'], end="\n")
+    print("Response_RAG:", response['answer'], end="\n")
+
+    docintel = GoogleGenAIDocIntel(file_path="./data/Port Tariff.pdf")
+    response_docintel = docintel.get_response(user_query)
+    print("\nResponse_GoogleGenAIDocIntel:", response_docintel.text, end="\n")
     print(f"Time Taken: {time.time()-time_start}")
