@@ -5,3 +5,4 @@ tenacity
 llama_index
 llama-index-llms-google-genai
 llama-index-embeddings-huggingface
+llama-index-embeddings-google-genai
