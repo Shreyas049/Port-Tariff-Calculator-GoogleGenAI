@@ -1,6 +1,4 @@
-user_prompt = """
-Read the context carefully and calculate required tariffs payable by the following vessel berthing at the port of <Durban | Saldanha | Richard's Bay>:
-
+vessel_details = """
 **Vessel Details**
 
 General
@@ -38,6 +36,13 @@ Departure Time: 22 Nov 2024 13:00
 Activity/Operations
 Activity: Exporting Iron Ore
 Number of Operations: 2
+"""
 
-Note: Do not provide any explanation. Directly provide values that are asked.
+user_query = """For the given vessel calculate following costs: 
+1. Light Dues, 
+2. Port Dues, 
+3. Towage Dues, 
+4. Vehicle Traffic Services, 
+5. Pilotage Dues, 
+6. Running of vessel lines dues
 """

@@ -1,42 +1,56 @@
-from llama_index.core import Document, VectorStoreIndex, StorageContext, Settings
+from llama_index.core import Document, VectorStoreIndex, StorageContext
+from llama_index.core.node_parser import SentenceSplitter, HierarchicalNodeParser, MarkdownNodeParser
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import SentenceSplitter, TokenTextSplitter
 from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.llms.google_genai import GoogleGenAI
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
+from google.genai import types
 from pydantic import BaseModel, Field
 from typing import Optional
 import re
+import json
 
 from conf import config
+from query import vessel_details
+
 
 class Tariffs(BaseModel):
-    light_dues: Optional[str] = Field(description="Light Dues for the vessel")
-    port_dues: Optional[str] = Field(description="Port Dues for the vessel")
-    towage_dues: Optional[str] = Field(description="Towage Dues for the vessel")
-    vts_dues: Optional[str] = Field(description="Vehicle Traffic Services (VTS) dues for the vessel")
-    pilotage_dues: Optional[str] = Field(description="Pilotage Dues for the vessel")
-    running_of_vessel_lines_dues: Optional[str] = Field(description="Running of Vessel Lines Dues for the vessel")
+    """<Think>Extract pydantic information below"""
+    light_dues: Optional[str] = Field(description="Light dues required by the vessel for berting at given port.")
 
 
-llm = GoogleGenAI(
-    api_key=config.google_genai_api_key,
-    model=config.google_genai_model_better
-)
-llm = llm.as_structured_llm(Tariffs)
+class ModelSettings():
+    system_prompt = """
+    **You are an expert at reading Tariff documents for ships/vessels at variousPorts.**
+    **Based on the provided Vessel Details, your job is to think carefully and answer query accurately.**
+    **For any response if any calculations are needed, think, calculate and only then answer.**
+    **Do not provide any explanations or additional information in response. Only answer whatever is asked.**\n
+    **Try to provide answer in JSON format. For e.g. [{'key_1': 'value_1', 'key_2', 'value_2'}]**
+    """
 
-# embeddings model settings, use whichever
-embed_model = HuggingFaceEmbedding(
-    # model_name="sentence-transformers/all-MiniLM-L6-v2"     # free, lightweight, high-performing model
-    # model_name="BAAI/bge-small-en"                        # free, open-source
-    model_name="sentence-transformers/all-mpnet-base-v2"  # free, better accuracy, larger, slower
-)
+    llm = GoogleGenAI(
+        model=config.google_genai_model_better,
+        api_key=config.google_genai_api_key,
+        generation_config=types.GenerateContentConfig(
+            system_instruction=f"""{system_prompt}\n{vessel_details}""",
+            # response_mime_type='application/json',
+            # response_schema=Tariffs,
+        )
+    )
+    # llm = llm.as_structured_llm(Tariffs)
 
-# apply settings
-Settings.llm = llm
-Settings.embed_model = embed_model
-Settings.chunk_size = 512       # chunks of 512 tokens
-Settings.chunk_overlap = 50     # Overlap to retain context
+    # embeddings model settings, use whichever
+    embed_model = GoogleGenAIEmbedding(
+        model_name="text-embedding-004",
+        api_key=config.google_genai_api_key
+    )
+    
+    # embed_model = HuggingFaceEmbedding(
+    #     # model_name="sentence-transformers/all-MiniLM-L6-v2"     # free, lightweight, high-performing model
+    #     # model_name="BAAI/bge-small-en"                        # free, open-source
+    #     # model_name="sentence-transformers/all-mpnet-base-v2"  # free, better accuracy, larger, slower
+    # )
 
 
 class PortTariffEngine:
@@ -68,104 +82,51 @@ class PortTariffEngine:
             )
         
         return documents
-    
-    # async def _generate_better_query(self, original_query):
-    #     # Use LLM to generate a more targeted query
-    #     prompt = f"""
-    #     I want to search for information in a port tariff document. 
-    #     Given the following user query, generate 2-3 specific search queries that would help find the exact tariff information needed:
         
-    #     Original query: {original_query}
+    async def _get_query_engine(self, text):
+        # Create documents
+        documents = [Document(text=text, metadata={"filename": self.filename})]
         
-    #     Format your response as JSON with a list of queries. Example:
-    #     {{
-    #         "queries": [
-    #             "specific search query 1",
-    #             "specific search query 2"
-    #         ]
-    #     }}
-    #     """
-        
-    #     response = await llm.acomplete(prompt)
-    #     try:
-    #         query_data = json.loads(response.text)
-    #         return query_data["queries"]
-    #     except:
-    #         # Fallback to original query if parsing fails
-    #         return [original_query]
-    
-    async def _get_query_engine(self, documents):
         # Create transformer for better chunking
-        text_splitter = TokenTextSplitter(
-            chunk_size=512,  # Smaller chunks for more precise retrieval
-            chunk_overlap=50
+        parser = HierarchicalNodeParser.from_defaults(
+            chunk_sizes=[4096, 2048, 1024, 512],
+            chunk_overlap=256
         )
-        
-        # Use ingestion pipeline with better transformations
-        pipeline = IngestionPipeline(
-            transformations=[text_splitter, embed_model]
+        nodes = parser.get_nodes_from_documents(documents)
+
+        # per-index
+        index = VectorStoreIndex(
+            nodes=nodes,
+            embed_model=ModelSettings.embed_model
         )
-        
-        nodes = await pipeline.arun(documents=documents, num_workers=3)
-        
-        # Use vector store with metadata filtering capabilities
-        index = VectorStoreIndex(nodes=nodes)
-        
-        # Reranker to prioritize most relevant chunks. reduces noise and improves accuracy
-        reranker = SentenceTransformerRerank(
-            model="cross-encoder/ms-marco-TinyBERT-L-2-v2", 
-            # model="cross-encoder/ms-marco-MiniLM-L-12-v2",
-            top_n=10  # Retrieve more candidates for reranking
-        )
+
+        # # Reranker to prioritize most relevant chunks. reduces noise and improves accuracy
+        # reranker = SentenceTransformerRerank(
+        #     model="cross-encoder/ms-marco-TinyBERT-L-2-v2", 
+        #     # model="cross-encoder/ms-marco-MiniLM-L-12-v2",
+        #     top_n=10        # Retrieve more candidates for reranking
+        # )
         
         # Create query engine with better parameters
         query_engine = index.as_query_engine(
-            similarity_top_k=30,                # Retrieve more initially
-            node_postprocessors=[reranker],
+            llm=ModelSettings.llm,
+            similarity_top_k=20,                # Retrieve more initially
             response_mode="compact"             # for factual retrieval, another option=tree_summarize
+            # node_postprocessors=[reranker],
         )
-        
         return query_engine
     
     
     async def query_llm(self, query: str):
-        # create page-wise documents
-        documents = await self._get_documents()
-
         # create query-engine over documents
-        query_engine = await self._get_query_engine(documents=documents)
-
-        # # Generate better queries
-        # better_queries = await self._generate_better_query(query)
-        
-        # # Run multiple queries and combine results
-        # all_responses = []
-        # all_sources = []
-        
-        # for better_query in better_queries:
-        #     response = await query_engine.aquery(better_query)
-        #     all_responses.append(response.response)
-        #     all_sources.extend(response.source_nodes)
-        
-        # # Use LLM to synthesize the final answer
-        # synthesis_prompt = f"""
-        # Given the following information retrieved from a port tariff document, calculate the tariffs for the vessel described in the original query:
-        
-        # Original query: {query}
-        
-        # Retrieved information:
-        # {' '.join(all_responses)}
-        
-        # Respond with a structured breakdown of all applicable tariffs.
-        # """
-        # final_response = await llm.acomplete(synthesis_prompt)
+        query_engine = await self._get_query_engine(text=self.text)
 
         # query over documents
         response = await query_engine.aquery(query)
         results = {
             "answer": response.response,
             "sources": [
-                {"filename": node.metadata["filename"], "section": node.metadata["section"]}
+                {"filename": node.metadata["filename"]}
                 for node in response.source_nodes
             ]
         }

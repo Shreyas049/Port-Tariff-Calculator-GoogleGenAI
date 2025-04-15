@@ -25,8 +25,8 @@ The Port Tariff Calculator is a GenAI application designed to calculate port tar
    - Make sure you have the tariff document in the `./data` directory
    - The system expects a file named "Port Tariff.pdf"
 
-3. **Adjust Prompts**
-   - Customize the user_prompt in `./prompts.py` according to your needs
+3. **query.py**
+   - Customize the vessel_details & user_query in `./query.py` according to your needs
 
 4. **Check Paths**
    - Verify all required paths are correct in `main.py`
@@ -56,7 +56,7 @@ Main Repo
 ├── model/
 │   ├── agent_document_loader.py # Document Loader agent that extracts text from PDF
 │   └── agent_porttariff_engine.py # PortTariffEngine class with RAG implementation
-├── prompts.py                   # Contains user query prompts
+├── query.py                     # Contains user query prompts
 ├── main.py                      # Main execution script
 └── requirements.txt             # Dependencies
 ```
